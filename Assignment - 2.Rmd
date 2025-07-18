@@ -1,0 +1,206 @@
+---
+title: "Assignment - 2"
+author: "N .Hema Sunddar"
+date: "`2025-07-18`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r}
+# Introduction
+
+# Kaggle sales dataset was downloaded from: 
+#<https://www.kaggle.com/datasets/ishanshrivastava28/superstore-sales>
+# It originally contains 9,995 rows of retail sales transactions.
+#To simplify analysis and avoid console output truncation 
+#(where only 47 rows display and the rest are omitted),
+#the dataset was reduced to a subset of 50 rows.
+#This data set cointains row id, order.date,shiping.date,segment, state, region,
+#category,sub.category,sales, Quantity, discount, profit.
+#Data Cleaning like Missing values in Quantity and Sales were identified and replaced with column means.
+#Rows with missing Profit values were removed.
+#Date Processing: Order dates were converted to date format, and new columns like Year,
+#Month, and Weekday were created using the lubridate package.
+#adding a colunu A Performance column was created to classify records as “High” or “Low” based on average profit.
+
+
+
+#Loaded installed packages
+library(dplyr)
+library(ggplot2)
+library(lubridate)
+
+# import the data from your saved locations
+sales <- read.csv("~/Superstoresass2.csv")
+View(sales)
+head(sales)
+tail(sales)
+
+#### data cleaning
+#1) Show & count all missing values using is.na() and sum(is.na()).
+
+is.na(sales)
+
+sum(is.na(sales$Quantity))# count all missing values
+
+#2) Replace NA in Quantity and sales with column mean. 
+
+sales$Quantity <- as.numeric(sales$Quantity)
+sales$Quantity[is.na(sales$Quantity)] <- mean(sales$Quantity, na.rm = TRUE) # replace NA in QUantity column
+
+sales$sales <- as.numeric(sales$sales)
+sales$sales[is.na(sales$sales)] <- mean(sales$sales, na.rm = TRUE) # replace NA in sales column
+
+#sales$Discount <- as.numeric(sales$Discount)
+#sales$Discount[is.na(sales$Discount)] <- mean(sales$Discount, na.rm = TRUE)
+
+print(sales)
+
+#3) Drop rows where Profit is NA.
+
+rows_before <- nrow(sales)
+print(rows_before) # before cleaning the NA in Profit
+
+profit_rows <- na.omit(sales$Profit) # removing the NA Values in Profit
+print(profit_rows)
+
+# Extra drop rows where discount is NA
+#rows_beforeDis <- na.omit(sales$Discount)
+#print(rows_beforeDis)
+
+#4) Show number of rows before and after cleaning. 
+
+rows_after <- nrow(sales)
+print(rows_after)# after cleaning
+
+####Date Features with lubridate 
+#1) Convert Date column to Date type 
+
+sales$Order.Date <- dmy(sales$Order.Date)
+print(sales$Order.Date)
+
+#2) Add columns: Year, Month (label), Weekday (label). 
+
+sales$year <- year(sales$Order.Date)
+print(sales$year)# created a year column
+
+sales$month <- month(sales$Order.Date, label = TRUE)
+print(sales$month) # created a month column
+
+sales$weekday <- wday(sales$Order.Date, label = TRUE)
+print(sales$weekday) # created a weekday column
+
+# 3) Find : Month with highest revenue, Day with lowest average units sold
+# Month with highest revenue
+month_highest.revenue <- sales %>% group_by(month) %>% summarise(Totalprofit = sum(Profit)) %>% arrange(desc(Totalprofit)) %>% head(1)
+print(month_highest.revenue)
+
+# Day with lowest average Quantity
+day_avg.Quantity <- sales %>% summarise(avgQuantity = mean(Quantity)) %>% arrange(avgQuantity) %>% head(1)
+print(day_avg.Quantity)
+
+#### Loops & Conditional Logic
+#1) Use a for loop to print monthly profile totals.
+
+monthly_profits <- sales %>% summarise(totalprofit = sum(Profit))
+for(i in 1:nrow(monthly_profits)){
+  print(paste("Total profit in", monthly_profits$Month[i], ":", monthly_profits$totalprofit[i]))
+}
+
+#2) Create Performance column :"High" if Profit > avg profit, "Low" 
+avg_profit <- mean(sales$Profit)
+sales$performance <- ifelse(sales$Profit > avg_profit, "High","Low")
+print(sales$performance)
+####Grouping, Aggregation & Custom Function
+# 1.1) Total Sales by Region
+region_sales <- aggregate(Profit ~ Region, data = sales, sum)
+print(region_sales)
+
+#1.2) Average Sales by Category
+category_avg <- aggregate(Profit ~ Category, data = sales, mean)
+print(category_avg)
+
+#1.3) Region with highest average profit
+region_avg_sales <- aggregate(Profit ~ Region, data = sales, mean)
+print("Region with highest average Profit:")
+print(region_avg_sales[which.max(region_avg_sales$Profit), ])
+
+#2) Write a function region_report
+
+region_report <- function(State) {
+  region_data <- sales[sales$Region == State, ]
+  total_sales <- sum(region_sales$Profit)
+  
+  Category_sales <- aggregate(Profit ~ Category, data = region_data, sum)
+  top_Category <- Category_sales[which.max(Category_sales$profit), ]
+  
+  high_days <- region_data$Date[region_sales$Profit > region_avg_sales]
+  
+  print(paste("Report for region:", State))
+  print(paste("Total sales:", total_sales))
+  print("Top selling Category:")
+  print(top_Category)
+  print("Dates with above-average sales:")
+  print(high_days)
+}
+# Example 
+#region_report("Central")
+#region_report("East")
+#region_report("South")
+region_report("West")
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo= FALSE}
+#1) Bar Chart: Region vs Profit
+
+ggplot(sales, aes(x = Region, y = Profit))+
+  geom_bar(stat = "identity", fill = "green")+
+  ggtitle("Total Profits by Region")+
+  theme_minimal()
+
+#2) Line Chart: Date vs Profits
+
+ggplot(sales, aes(x = Order.Date, y = Profit)) +
+  geom_line(colour = "red") +
+  ggtitle("Daily Profit Trend")+
+  theme_minimal()
+
+#3) tacked Bar Chart: Category vs sales (fill = Performance)
+
+ggplot(sales, aes(x = Category, y = sales, fill = performance ))+
+  geom_bar(stat = "identity")+
+  ggtitle("Sales by Category and performance")+
+  theme_minimal()
+
+
+# Conclusion
+
+# From analyzing the Superstore dataset (subset of 50 rows),I observe 
+#1) Monthly Profit Patterns we can observe One specific month contributed the highest total profit,
+#indicating a potential seasonal sales peak. This insight can help plan marketing and 
+#inventory strategies for that period.and another month which is to focus on it because it s showing losses
+#2) The West region has emerged as the highest profit generating area'
+#3) we identified individual sales contributing strongly to overall profitability.
+#Because of the creating new column like performance and it has high and low categrioes
+#4) Visualizations with ggplot2 
+# 1.Bar charts clearly showed regional differences in profit.
+# 2.Line charts displayed day-to-day profit fluctuations.
+# 3.Stacked bar charts revealed category-wise sales contributions, 
+#highlighting how product categories align with performance levels.
+
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
